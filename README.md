@@ -6,6 +6,6 @@ This project start with the code from https://github.com/yulequan/face-alignment
 
 I do not make sure the implementation is right, but in my experiment, i get the right face with right keypoints.
 
-Only the Key codes were placed here Now.  
+You should read yulequan's codes first, then compare them with mine.
 
-To be continued.
+Sorry for my codestyle : (
