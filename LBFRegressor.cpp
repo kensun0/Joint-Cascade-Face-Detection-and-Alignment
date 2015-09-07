@@ -660,7 +660,8 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
                          const vector<BoundingBox> & bounding_boxs){
     
     // data augmentation and multiple initialization
-    vector<int> augmented_images;
+    
+    vector<int> augmented_images;  // use index instead of  real img
     vector<BoundingBox> augmented_bounding_boxs;
     vector<Mat_<float> > augmented_ground_truth_shapes;
 	vector<int> augmented_ground_truth_faces;
