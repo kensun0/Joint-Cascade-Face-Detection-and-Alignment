@@ -6,6 +6,12 @@
 //  Copyright (c) 2015 lequan. All rights reserved.
 //
 
+//
+//  Eidt by kensun0 on 9/9/15.
+//  some original functions never have been called.
+//  For example, GetMeanShape2() will be called instead of GetMeanShape() which is original.
+//
+
 #ifndef FACE_ALIGNMENT_H
 #define FACE_ALIGNMENT_H
 #include "opencv2/objdetect/objdetect.hpp"
