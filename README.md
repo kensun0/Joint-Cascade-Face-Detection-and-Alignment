@@ -4,8 +4,10 @@ This project is a C++ reimplementation of joint cascade face detection and align
 
 This project start with the code from https://github.com/yulequan/face-alignment-in-3000fps
 
-I do not make sure the implementation is right, but in my experiment, i get the right face with right keypoints.
-
 You should read yulequan's codes first, then compare them with mine.
+
+I do not make sure the implementation is right, but in my experiment, i get the right face with right keypoints at 4000FPS on i7-3770K (optimization version).
+
+The version here is only for training. You shuold implement a version for testing by yourself.
 
 Sorry for my codestyle : (
