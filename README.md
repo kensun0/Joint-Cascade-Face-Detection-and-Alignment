@@ -10,7 +10,7 @@ There are some differences between paper's and mine:
 
 1. Without SIFT+SVM
 2. Without multi-scale pixel difference feature
-3. Without non-maxmium suppresion
+3. Without non-maxmium suppression
 
 I do not make sure the implementation is right, but in my experiment, i get the right face with right keypoints at 50FPS on i7-3770K (optimization version).
 
