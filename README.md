@@ -7,6 +7,7 @@ This project start with the code from https://github.com/yulequan/face-alignment
 You should read yulequan's codes first, then compare them with mine.
 
 There are some differences between paper's and mine:
+
 1. Without SIFT+SVM
 2. Without multi-scale pixel difference feature
 3. Without non-maxmium suppresion
