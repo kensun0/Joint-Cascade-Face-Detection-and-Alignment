@@ -186,7 +186,7 @@ void RandomForest::Train(
 									float score=0;
 									GetResultfromTree(RandomForest_[s].rfs_[r][t],images[augmented_images[n]],current_shapes[n],bounding_boxs[n],rotation,scale,&bincode,&score);
 									tmp_fi+=score;
-									if (tmp_fi>=RandomForest_[s].rfs_[r][t].threshold)
+									if (tmp_fi<RandomForest_[s].rfs_[r][t].threshold)
 									{
 										tmp_isface=false;
 										break;
@@ -196,7 +196,7 @@ void RandomForest::Train(
 							}
 							if(!tmp_isface)break;
 						}
-						if (!tmp_isface)
+						if (tmp_isface)
 						{
 							current_fi[n]=tmp_fi;
 							current_weight[n]=exp(0.0-ground_truth_faces[n]*current_fi[n]);
