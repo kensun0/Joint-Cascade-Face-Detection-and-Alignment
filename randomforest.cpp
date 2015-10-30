@@ -174,9 +174,9 @@ void RandomForest::Train(
 						float tmp_fi=0;
 						for (int s=0;s<=stages;++s)
 						{
-							for (int r=0;r<=i;++r)
+							for (int r=0;r<=RandomForest_[s].rfs_.size();++r)
 							{
-								for (int t=0;t<=j;++t)
+								for (int t=0;t<=RandomForest_[s].rfs_[r].size();++t)
 								{
 									//get score 
 									Mat_<float> rotation;
