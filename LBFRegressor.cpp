@@ -752,7 +752,7 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
                          mean_shape_,shapes_residual_);
         
         cout << "train random forest of "<< stage <<" stage" <<endl;
-        RandomForest_[stage].Train(images, augmented_images, augmented_ground_truth_shapes, augmented_ground_truth_faces,current_shapes, current_fi,current_weight,augmented_bounding_boxs, mean_shape_, shapes_residual_, stage, RandomForest_);
+        RandomForest_[stage].Train(images, augmented_images, augmented_ground_truth_shapes, augmented_ground_truth_faces,current_shapes, current_fi,current_weight,augmented_bounding_boxs, mean_shape_, shapes_residual_, stage, RandomForest_, Models_);
         float t2 = (float)cvGetTickCount();
         cout << "the random forest of "<< stage<<" stage has been trained, cost "<< (t2-t1)/((float)cvGetTickFrequency()*1000*1000) <<" s"<<endl<<endl;
 
