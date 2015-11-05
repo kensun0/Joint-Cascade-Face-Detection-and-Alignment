@@ -44,7 +44,8 @@ public:
                const cv::Mat_<float>& mean_shape,
                std::vector<cv::Mat_<float> >& shapes_residual,
                int stages,
-			   std::vector<RandomForest>& RandomForest_
+	       std::vector<RandomForest>& RandomForest_，
+	       std::vector<std::vector<struct model*> > Models_
                );
     void Read(std::ifstream& fin);
     void Write(std::ofstream& fout);
