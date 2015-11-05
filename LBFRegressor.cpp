@@ -680,7 +680,8 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
             
 			if (ground_truth_faces[i]==-1)
 			{
-				for (int k=0;k<10;++k)
+				// from 2015.11.5, k must be 1
+				for (int k=0;k<1;++k)
 				{
 					int tmp_idx;
 					do{
