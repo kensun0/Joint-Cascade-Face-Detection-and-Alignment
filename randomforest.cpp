@@ -11,6 +11,98 @@
 using namespace std;
 using namespace cv;
 
+void GetCodefromRandomForestOnlyOnce(struct feature_node *binfeature,
+                                           const int index,
+                                           const vector<Tree>& rand_forest,
+                                           const Mat_<uchar>& image,
+                                           const Mat_<float>& shape,
+                                           const BoundingBox& bounding_box,
+                                           const Mat_<float>& rotation,
+                                           const float scale){
+    
+    int leafnode_per_tree = pow(2.0,rand_forest[0].max_depth_-1);
+
+    for (int iter = 0;iter<rand_forest.size();iter++){
+        int currnode = 0;
+        int bincode = 1;
+        for(int i = 0;i<rand_forest[iter].max_depth_-1;i++){
+            float x1 = rand_forest[iter].nodes_[currnode].feat[0];
+            float y1 = rand_forest[iter].nodes_[currnode].feat[1];
+            float x2 = rand_forest[iter].nodes_[currnode].feat[2];
+            float y2 = rand_forest[iter].nodes_[currnode].feat[3];
+
+			int mark1 = rand_forest[iter].nodes_[currnode].feat[4];
+			int mark2 = rand_forest[iter].nodes_[currnode].feat[5];
+            
+			float landmark_x1 = shape(mark1,0);
+			float landmark_y1 = shape(mark1,1);
+
+			float landmark_x2 = shape(mark2,0);
+			float landmark_y2 = shape(mark2,1);
+
+            float project_x1 = rotation(0,0) * x1 + rotation(0,1) * y1;
+            float project_y1 = rotation(1,0) * x1 + rotation(1,1) * y1;
+            project_x1 = scale * project_x1 * bounding_box.width / 2.0;
+            project_y1 = scale * project_y1 * bounding_box.height / 2.0;
+            int real_x1 = (int)(project_x1 + landmark_x1);
+            int real_y1 = (int)(project_y1 + landmark_y1);
+            real_x1 = max(0,min(real_x1,image.cols-1));
+            real_y1 = max(0,min(real_y1,image.rows-1));
+            
+            float project_x2 = rotation(0,0) * x2 + rotation(0,1) * y2;
+            float project_y2 = rotation(1,0) * x2 + rotation(1,1) * y2;
+            project_x2 = scale * project_x2 * bounding_box.width / 2.0;
+            project_y2 = scale * project_y2 * bounding_box.height / 2.0;
+            int real_x2 = (int)(project_x2 + landmark_x2);
+            int real_y2 = (int)(project_y2 + landmark_y2);
+            real_x2 = max(0,min(real_x2,image.cols-1));
+            real_y2 = max(0,min(real_y2,image.rows-1));
+            
+            int pdf = (int)(image(real_y1,real_x1))-(int)(image(real_y2,real_x2));
+            if (pdf < rand_forest[iter].nodes_[currnode].thresh){
+                currnode =rand_forest[iter].nodes_[currnode].cnodes[0];
+            }
+            else{
+                currnode =rand_forest[iter].nodes_[currnode].cnodes[1];
+                bincode += pow(2.0, rand_forest[iter].max_depth_-2-i);
+            }
+        }
+        binfeature[index+iter].index = leafnode_per_tree*(index+iter)+bincode;
+        binfeature[index+iter].value = 1;
+        
+    }
+}
+void GlobalRegressionOnlyOnce(struct feature_node **binfeatures,
+	Mat_<float>& current_shapes,
+	BoundingBox& bounding_boxs,
+	const Mat_<float>& mean_shape,
+	vector<struct model*>& models
+	){
+		float tmp;
+		float scale;
+		Mat_<float>rotation;
+		int num_residual = current_shapes.rows*2;
+		Mat_<float> deltashape_bar(num_residual/2,2);
+		Mat_<float> deltashape_bar1(num_residual/2,2);
+		
+#pragma omp parallel for
+		for (int j=0;j<num_residual;j++){
+			tmp = predict(models[j],binfeatures[0]);
+			if (j < num_residual/2){
+				deltashape_bar(j,0) = tmp;
+			}
+			else{
+				deltashape_bar(j-num_residual/2,1) = tmp;
+			}
+		}
+
+		SimilarityTransform(ProjectShape(current_shapes,bounding_boxs),mean_shape,rotation,scale);
+		transpose(rotation,rotation);
+		deltashape_bar1 = scale * deltashape_bar * rotation;
+		current_shapes= ReProjectShape((ProjectShape(current_shapes,bounding_boxs)+deltashape_bar1),bounding_boxs);
+		
+}
+
 int my_cmp(pair<float,int> p1, pair<float,int> p2)
 {
 	return p1.first < p2.first;
@@ -150,16 +242,41 @@ void RandomForest::Train(
 			{
 				if (current_fi[n]<rfs_[i][j].threshold && ground_truth_faces[n]==-1)
 				{
+					int nSelected=0;
 					while(1)
 					{
 						RNG random_generator(getTickCount());
 						int tmp_idx=n;
 
 						BoundingBox new_box;
-						while (tmp_idx==n)
+						while (tmp_idx==n || ground_truth_faces[tmp_idx]==1)
 						{
 							tmp_idx = random_generator.uniform(0.0,ground_truth_faces.size()-1);
 						}
+						nSelected++;
+						if (nSelected>=images[augmented_images[n]].rows*images[augmented_images[n]].cols*1.0)
+						{
+							Mat_<uchar> newImg = images[augmented_images[n]];
+							if(random_generator.uniform(0.0,1.0)>0.8)
+							{
+								resize(images[augmented_images[tmp_idx]],newImg,newImg.size());
+							}else
+							{
+								Point center = Point( images[augmented_images[n]].cols/2, images[augmented_images[n]].rows/2 );
+								double angle = random_generator.uniform(0.0,360.0);
+								double scale = 1.0;
+								Mat_<float> rot_mat=getRotationMatrix2D(center,angle,scale);
+								warpAffine( images[augmented_images[n]], newImg, rot_mat, newImg.size());
+								rot_mat.release()；
+							}// else read a new image, then resize it to images[augmented_images[n]]
+
+							for (int i2=0;i2<images[augmented_images[n]].rows;++i2)
+								for(int j2=0;j2<images[augmented_images[n]].cols;++j2)
+									images[augmented_images[n]].data[i2*images[augmented_images[n]].cols+j2]=newImg.data[i2*images[augmented_images[n]].cols+j2];
+							newImg.release();
+							nSelected=0;
+						}
+
 
 						getRandomBox(images[augmented_images[n]],bounding_boxs[tmp_idx], new_box);
 						Mat_<float> temp = ProjectShape(ground_truth_shapes[tmp_idx], bounding_boxs[tmp_idx]);
@@ -174,9 +291,16 @@ void RandomForest::Train(
 						float tmp_fi=0;
 						for (int s=0;s<=stages;++s)
 						{
-							for (int r=0;r<=RandomForest_[s].rfs_.size();++r)
+							int iRange=RandomForest_[s].rfs_.size()-1;
+							int jRange=RandomForest_[s].rfs_[i].size()-1;
+							if (s==stages)
 							{
-								for (int t=0;t<=RandomForest_[s].rfs_[r].size();++t)
+								iRange=i;
+								jRange=j;
+							}
+							for (int r=0;r<=iRange;++r)
+							{
+								for (int t=0;t<=jRange;++t)
 								{
 									//get score 
 									Mat_<float> rotation;
@@ -195,6 +319,23 @@ void RandomForest::Train(
 								if(!tmp_isface)break;
 							}
 							if(!tmp_isface)break;
+							if ((s-1)>=0)
+							{
+								struct feature_node **binfeatures = new struct feature_node* [1];
+								binfeatures[0] = new struct feature_node[RandomForest_[s-1].max_numtrees_*RandomForest_[s-1].num_landmark_+1];
+								Mat_<float> rotation;
+								float scale;
+								SimilarityTransform(ProjectShape(current_shapes[n],bounding_boxs[n]),mean_shape,rotation,scale);
+								for (int j =0; j <RandomForest_[s-1].num_landmark_; j++){
+									GetCodefromRandomForestOnlyOnce(binfeatures[0], j*RandomForest_[s-1].max_numtrees_,RandomForest_[s-1].rfs_[j], images[augmented_images[n]], current_shapes[n],
+										bounding_boxs[n], rotation, scale);
+								}
+								binfeatures[0][RandomForest_[s-1].num_landmark_ * RandomForest_[s-1].max_numtrees_].index = -1;
+								binfeatures[0][RandomForest_[s-1].num_landmark_ * RandomForest_[s-1].max_numtrees_].value = -1;
+								GlobalRegressionOnlyOnce(binfeatures, current_shapes[n],bounding_boxs[n],mean_shape,Models_[s-1]);
+								delete[] binfeatures[0];
+								delete[] binfeatures;
+							}
 						}
 						if (tmp_isface)
 						{
