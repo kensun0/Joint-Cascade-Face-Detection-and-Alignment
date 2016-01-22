@@ -291,16 +291,19 @@ void RandomForest::Train(
 						float tmp_fi=0;
 						for (int s=0;s<=stages;++s)
 						{
-							int iRange=RandomForest_[s].rfs_.size()-1;
-							int jRange=RandomForest_[s].rfs_[i].size()-1;
+							int iRange=RandomForest_[s].rfs_.size();
 							if (s==stages)
 							{
 								iRange=i;
-								jRange=j;
 							}
-							for (int r=0;r<=iRange;++r)
+							for (int r=0;r<iRange;++r)
 							{
-								for (int t=0;t<=jRange;++t)
+								int jRange=RandomForest_[s].rfs_[i].size();
+								if (r==i)
+								{
+									jRange=j;
+								}
+								for (int t=0;t<jRange;++t)
 								{
 									//get score 
 									Mat_<float> rotation;
