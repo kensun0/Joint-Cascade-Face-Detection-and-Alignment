@@ -291,15 +291,15 @@ void RandomForest::Train(
 						float tmp_fi=0;
 						for (int s=0;s<=stages;++s)
 						{
-							int iRange=RandomForest_[s].rfs_.size();
+							int iRange=RandomForest_[s].rfs_.size()-1;
 							if (s==stages)
 							{
 								iRange=i;
 							}
 							for (int r=0;r<iRange;++r)
 							{
-								int jRange=RandomForest_[s].rfs_[i].size();
-								if (r==i)
+								int jRange=RandomForest_[s].rfs_[r].size()-1;
+								if (r==i && s==stages)
 								{
 									jRange=j;
 								}
