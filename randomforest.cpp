@@ -114,7 +114,7 @@ void RandomForest::Train(
 						 vector<int>& find_times,
 						 const vector<int>& augmented_images,
                          vector<Mat_<float>>& ground_truth_shapes,
-						 const vector<int>& ground_truth_faces,
+						 vector<int>& ground_truth_faces,
                          vector<Mat_<float>>& current_shapes,
 						 vector<float>& current_fi,
 						 vector<float>& current_weight,
@@ -135,9 +135,9 @@ void RandomForest::Train(
 	}
 	
     for (int i=0;i<num_landmark_;i++){
-        clock_t tt = clock();
+        clock_t tt_clk = clock();
         for (int j =0;j <max_numtrees_; j++){
-			clock_t ss = clock();
+			clock_t ss_clk = clock();
 			//
 			/*index.clear();
 			is = max( (double)floor(j*Q - j*Q*overlap_ratio_ ), 0.0);
@@ -166,13 +166,14 @@ void RandomForest::Train(
 				float score=0;
 				GetResultfromTree(rfs_[i][j],images[augmented_images[n]],current_shapes[n],bounding_boxs[n],rotation,scale,&bincode,&score);
 				current_fi[n] = current_fi[n] + score;
+				//current_weight[n]=exp(0.0-ground_truth_faces[n]*current_fi[n]);
 			}
 			float fiT=0,fiF=0;
 			float weightT=0,weigthF=0;
 			int numT=0,numF=0;
 			double maxF=DBL_MIN,minF=DBL_MAX;
 			double maxW=DBL_MIN,minW=DBL_MAX;
-
+			int maxImgIdx=0;
 			for(int n=0;n<current_fi.size();++n)
 			{
 				if (find_times[augmented_images[n]]<=MAXFINDTIMES)
@@ -200,10 +201,17 @@ void RandomForest::Train(
 					if (current_weight[n]>maxW)
 					{
 						maxW=current_weight[n];
+						maxImgIdx=n;
 					}
 					if (current_weight[n]<minW)
 					{
 						minW=current_weight[n];
+					}
+					//remove samples with too high weight
+					if(current_weight[n]>5000)
+					{
+						find_times[augmented_images[n]]=MAXFINDTIMES+1;
+						ground_truth_faces[n]=-1;
 					}
 				}
 			}
@@ -214,7 +222,19 @@ void RandomForest::Train(
 			cout<<"max weight:"<<maxW<<"\t\tmin weight:"<<minW<<endl;
 			cout<<"avg     fiT:"<<    fiT/numT<<"\t\tavg     fiF:"<<fiF/numF<<endl;
 			cout<<"avg weightT:"<<weightT/numT<<"\t\tavg weightF:"<<weigthF/numF<<endl;
-
+			if (1)
+			{
+				Mat_<uchar>tmpimg = images[augmented_images[maxImgIdx]].clone();
+				for(int k=0;k<current_shapes[maxImgIdx].rows;k++){
+					circle(tmpimg,Point(current_shapes[maxImgIdx](k,0),current_shapes[maxImgIdx](k,1)),3,Scalar(255));
+				}
+				rectangle(tmpimg,Point((int)bounding_boxs[maxImgIdx].start_x,(int)bounding_boxs[maxImgIdx].start_y),
+					Point((int)bounding_boxs[maxImgIdx].start_x+bounding_boxs[maxImgIdx].width,
+					(int)bounding_boxs[maxImgIdx].start_y+bounding_boxs[maxImgIdx].height),Scalar(255));
+				char tmpname[512];
+				sprintf(tmpname,"%d_%d_%d_%d_%f.jpg",stages_,i,j,ground_truth_faces[maxImgIdx],current_weight[maxImgIdx]);
+				imwrite(tmpname,tmpimg);
+			}
 			// remove false samples according to precision-recall 
 			// sort fi with index
 			vector<pair<float,int>> fiSort;
@@ -291,6 +311,15 @@ void RandomForest::Train(
 			//system("pause");
 			//remove false samples , perform hard sample
 
+			int useful_pos=0;
+			for (int n=0;n<posLenth;++n )
+			{
+				if (find_times[augmented_images[n]]<=MAXFINDTIMES)
+				{
+					++useful_pos;
+				}
+			}
+			cout<<"useful pos sample: "<<useful_pos<<"   percent:"<<useful_pos*1.0/(posLenth)<<endl;
 			int useful_neg=0;
 			for (int n=posLenth;n<find_times.size();++n )
 			{
@@ -318,6 +347,12 @@ void RandomForest::Train(
 						RNG random_generator(getTickCount());
 						int tmp_idx=n;
 						BoundingBox new_box;
+						new_box.start_x=0;
+						new_box.start_y=0;
+						new_box.width=MINHEIGHT;
+						new_box.height=MINHEIGHT;
+						new_box.centroid_x=0+MINHEIGHT/2.0;
+						new_box.centroid_y=0+MINHEIGHT/2.0;
 						/*while (tmp_idx==n || ground_truth_faces[tmp_idx]==1)
 						{
 							tmp_idx = random_generator.uniform(0.0,ground_truth_faces.size()-1);
@@ -332,8 +367,8 @@ void RandomForest::Train(
 							for (int cc=0;cc<scale_map[augmented_images[n]].cols;++cc)
 							{
 								int map_value=(int)scale_map[augmented_images[n]](rr,cc);
-								if(map_value+rr<scale_map[augmented_images[n]].rows &&
-									map_value+cc<scale_map[augmented_images[n]].cols)
+								if( (map_value+rr)<scale_map[augmented_images[n]].rows &&
+									(map_value+cc)<scale_map[augmented_images[n]].cols)
 								{
 									new_box.start_x=rr;
 									new_box.start_y=cc;
@@ -477,10 +512,10 @@ void RandomForest::Train(
 				} 
 			}
 			cout<<"remove "<<remove_num<<" samples\n";
-			float time = float(clock() - ss) / CLOCKS_PER_SEC;
+			float time = float(clock() - ss_clk) / CLOCKS_PER_SEC;
 			cout<<"stage: "<<stages<<" landmark: "<<i<<" tree: "<<j<<" time:"<<time<<endl;
 		}
-        float time = float(clock() - tt) / CLOCKS_PER_SEC;
+        float time = float(clock() - tt_clk) / CLOCKS_PER_SEC;
         cout << "the train rf of "<< i <<"th landmark cost "<< time<<"s"<<endl;
 		
     }
