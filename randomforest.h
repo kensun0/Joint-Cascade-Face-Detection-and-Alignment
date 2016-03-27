@@ -34,9 +34,11 @@ public:
         }
     }
     void Train(const std::vector<cv::Mat_<uchar> >& images,
+		       std::vector<cv::Mat_<uchar> >& scale_map,
+			   std::vector<int>& find_times,
 			   const std::vector<int>& augmented_images,
                std::vector<cv::Mat_<float> >& ground_truth_shapes,
-			   const std::vector<int>& ground_truth_faces,
+			   std::vector<int>& ground_truth_faces,
                std::vector<cv::Mat_<float> >& current_shapes,
 			   std::vector<float>& current_fi,
 			   std::vector<float>& current_weight,
@@ -44,8 +46,9 @@ public:
                const cv::Mat_<float>& mean_shape,
                std::vector<cv::Mat_<float> >& shapes_residual,
                int stages,
-	       std::vector<RandomForest>& RandomForest_，
-	       std::vector<std::vector<struct model*> > Models_
+			   std::vector<RandomForest>& RandomForest_,
+			   std::vector<std::vector<struct model*> > Models_,
+			   int posLenth
                );
     void Read(std::ifstream& fin);
     void Write(std::ofstream& fout);
