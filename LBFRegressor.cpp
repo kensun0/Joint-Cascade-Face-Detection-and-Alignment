@@ -657,21 +657,36 @@ void LBFRegressor::GlobalPrediction(struct feature_node** binfeatures,
 void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
                          const vector<Mat_<float> >& ground_truth_shapes,
 						 const vector<int>& ground_truth_faces,
-                         const vector<BoundingBox> & bounding_boxs){
+                         const vector<BoundingBox> & bounding_boxs,int posLenth){
     
     // data augmentation and multiple initialization
-    
-    vector<int> augmented_images;  // use index instead of  real img
+    vector<int> augmented_images;
     vector<BoundingBox> augmented_bounding_boxs;
     vector<Mat_<float> > augmented_ground_truth_shapes;
 	vector<int> augmented_ground_truth_faces;
     vector<Mat_<float> > current_shapes;
 	vector<float> current_fi;
 	vector<float> current_weight;
-    
+    vector<int> find_times;
+	vector<Mat_<uchar>> scale_map;
+
+	// get mean shape from training shapes(only origin train images)
+	mean_shape_ = GetMeanShape2(ground_truth_shapes,bounding_boxs,ground_truth_faces);
+	cout << mean_shape_<<endl;
+
     RNG random_generator(getTickCount());
-    for(int i = 0;i < images.size();i++){
-        for(int j = 0;j < global_params.initial_num;j++){
+    for(int i = 0;i < images.size();i++)
+	{
+		find_times.push_back(0);
+		Mat_<uchar> ori_map=images[i].clone();
+		for (int m=0;m<ori_map.rows;++m)
+			for (int n=0;n<ori_map.cols;++n)
+			{
+				ori_map(m,n)=MINHEIGHT;
+			}
+		scale_map.push_back(ori_map);
+        for(int j = 0;j < global_params.initial_num;j++)
+		{
             int index = 0;
             do{
                 // index = (i+j+1) % (images.size());
@@ -680,7 +695,6 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
             
 			if (ground_truth_faces[i]==-1)
 			{
-				// since 2015.11.5, k must be 1
 				for (int k=0;k<1;++k)
 				{
 					int tmp_idx;
@@ -710,6 +724,7 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
 					current_shapes.push_back(ReProjectShape(temp1, new_box).clone());
 					current_fi.push_back(0);
 					current_weight.push_back(1);
+					
 				}
 			}
 			else
@@ -721,14 +736,23 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
 				augmented_bounding_boxs.push_back(bounding_boxs[i]);
 
 				// 2. Project current shape to bounding box of ground truth shapes
-				Mat_<float> temp = ProjectShape(ground_truth_shapes[index], bounding_boxs[index]);
+				//Mat_<float> temp = ProjectShape(ground_truth_shapes[index], bounding_boxs[index]);
+				Mat_<float> temp = mean_shape_.clone();
 				temp = ReProjectShape(temp, bounding_boxs[i]);
 				current_shapes.push_back(temp);
 				current_fi.push_back(0);
 				current_weight.push_back(1);
-			}
 
-           
+
+				/*Mat_<uchar> ttttttt=images[i].clone();
+				for(int k=0;k<temp.rows;k++){
+				circle(ttttttt,Point(temp(k,0),temp(k,1)),3,Scalar(255));
+				}
+				rectangle(ttttttt,Point(bounding_boxs[i].start_x,bounding_boxs[i].start_y),Point(bounding_boxs[i].start_x+bounding_boxs[i].width,bounding_boxs[i].start_y+bounding_boxs[i].height),Scalar(255));
+				imshow("test3",ttttttt);
+				waitKey(0);*/
+
+			}
         }
     }
 	vector<int> shape_index;
@@ -739,9 +763,7 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
 			shape_index.push_back(i);
 		}
 	}
-    // get mean shape from training shapes(only origin train images)
-    mean_shape_ = GetMeanShape2(ground_truth_shapes,bounding_boxs,ground_truth_faces);
-    cout << mean_shape_<<endl;
+    
     // train random forest
     int num_feature = global_params.landmark_num * global_params.max_numtrees * pow(2.0,(global_params.max_depth-1));
     int num_train_sample = (int)augmented_images.size();
@@ -753,7 +775,7 @@ void LBFRegressor::Train(const vector<Mat_<uchar> >& images,
                          mean_shape_,shapes_residual_);
         
         cout << "train random forest of "<< stage <<" stage" <<endl;
-        RandomForest_[stage].Train(images, augmented_images, augmented_ground_truth_shapes, augmented_ground_truth_faces,current_shapes, current_fi,current_weight,augmented_bounding_boxs, mean_shape_, shapes_residual_, stage, RandomForest_, Models_);
+        RandomForest_[stage].Train(images,scale_map,find_times, augmented_images, augmented_ground_truth_shapes, augmented_ground_truth_faces,current_shapes, current_fi,current_weight,augmented_bounding_boxs, mean_shape_, shapes_residual_, stage, RandomForest_,Models_,posLenth);
         float t2 = (float)cvGetTickCount();
         cout << "the random forest of "<< stage<<" stage has been trained, cost "<< (t2-t1)/((float)cvGetTickFrequency()*1000*1000) <<" s"<<endl<<endl;
 
