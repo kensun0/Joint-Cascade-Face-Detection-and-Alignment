@@ -20,8 +20,8 @@ public:
     int cnodes[2];
     bool isleafnode;
     float thresh;
-    float feat[6];   // there are 6 features in my version, the first four are the same as origin, the last two are keypoints.
-    //int landmarkId[2];
+    float feat[6];
+	//int landmarkId[2];
     std::vector<int> ind_samples;
     float score;
 
@@ -39,11 +39,11 @@ public:
         feat[1] = 0;
         feat[2] = 0;
         feat[3] = 0;
-	feat[4] = 0;
-	feat[5] = 0;
-	/*landmarkId[0] = 0;
-	landmarkId[1] = 0;*/
-	score = 0;
+		feat[4] = 0;
+		feat[5] = 0;
+		/*landmarkId[0] = 0;
+		landmarkId[1] = 0;*/
+		score = 0;
     }
     void Write(std::ofstream& fout){
         fout << issplit<<" "<< pnode <<" "<<depth<<" " <<cnodes[0]<<" "<<cnodes[1]<<" "<<isleafnode<<" "
@@ -87,8 +87,8 @@ public:
     float max_radio_radius_;
     float overlap_ration_;
    
-    float max_probility_;  // detection or alignment
-    float threshold;       // lessing than threshold means the sample is negative  
+	float max_probility_;
+	float threshold;
 
     // leafnodes id
     std::vector<int> id_leafnodes_;
@@ -106,6 +106,7 @@ public:
 		threshold = 0;
     }
     void Train(const std::vector<cv::Mat_<uchar> >& images,
+			   std::vector<int>& find_times,
 		       const std::vector<int>& augmented_images,
                const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 			   const std::vector<int>& ground_truth_faces,
@@ -122,6 +123,7 @@ public:
     
     //Splite the node
     void Splitnode(const std::vector<cv::Mat_<uchar> >& images,
+		           std::vector<int>& find_times,
 				   const std::vector<int>& augmented_images,
                    const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 				   const std::vector<int>& ground_truth_faces,
