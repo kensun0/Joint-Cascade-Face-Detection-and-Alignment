@@ -6,12 +6,6 @@
 //  Copyright (c) 2015 lequan. All rights reserved.
 //
 
-//
-//  Eidt by kensun0 on 9/9/15.
-//  some original functions never have been called.
-//  For example, GetMeanShape2() will be called instead of GetMeanShape() which is original.
-//
-
 #ifndef FACE_ALIGNMENT_H
 #define FACE_ALIGNMENT_H
 #include "opencv2/objdetect/objdetect.hpp"
@@ -36,6 +30,7 @@
 #include <fstream>
 #include <numeric>   
 #include <utility> 
+#include <omp.h>
 
 struct Params{
     
@@ -134,12 +129,14 @@ void getRandomBox(const cv::Mat_<uchar>& image, const BoundingBox& old_box, Boun
 
 #define SAVEBIN (0)
 
-#define MAXHEIGHT (120)
+#define MAXHEIGHT (60)
 
 #define MAXHEIGHT2 (240)
 
 #define ONLYSHAPE (1)
 
-#define MINHEIGHT (10)
+#define MINHEIGHT (16)
+
+#define MAXFINDTIMES (240*240*10)
 
 #endif
