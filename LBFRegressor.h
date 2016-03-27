@@ -101,7 +101,7 @@ public:
     void Train(const std::vector<cv::Mat_<uchar> >& images,
                const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 			   const std::vector<int>& ground_truth_faces,
-               const std::vector<BoundingBox> & bounding_boxs);
+               const std::vector<BoundingBox> & bounding_boxs, int posLenth);
     
     std::vector<cv::Mat_<float> > Predict(const std::vector<cv::Mat_<uchar> >& images,
                                            const std::vector<BoundingBox>& bounding_boxs,
