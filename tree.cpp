@@ -31,6 +31,7 @@ inline float calculate_var(const Mat_<float>& v1){
 }
 
 void Tree::Train(const vector<Mat_<uchar> >& images,
+				 vector<int>& find_times,
 				 const vector<int>& augmented_images,
                  const vector<Mat_<float> >& ground_truth_shapes,
 				 const vector<int>& ground_truth_faces,
@@ -72,7 +73,8 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
     for (int i=0; i < 6;i++){
         nodes_[0].feat[i] = 1;
     }
-	
+	/*nodes_[0].landmarkId[0]=0;
+	nodes_[0].landmarkId[1]=0;*/
     nodes_[0].ind_samples = index;
     nodes_[0].score=0;
 
@@ -81,7 +83,7 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
     int num_leafnodes = 1;
     float thresh;
     float feat[6];
-	
+	//int markId[2];
     bool isvaild;
     vector<int> lcind,rcind;
     lcind.reserve(index.size());
@@ -99,16 +101,17 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
                 }
                 else {
                     // separate the samples into left and right path
-                    Splitnode(images,augmented_images,ground_truth_shapes,ground_truth_faces,current_shapes,current_fi,current_weight,bounding_boxs,mean_shape,shapes_residual,
+                    Splitnode(images,find_times,augmented_images,ground_truth_shapes,ground_truth_faces,current_shapes,current_fi,current_weight,bounding_boxs,mean_shape,shapes_residual,
 						nodes_[n].ind_samples,thresh, feat,/*markId, */isvaild,lcind,rcind,stages);
                     // set the threshold and featture for current node
                     nodes_[n].feat[0] = feat[0];
                     nodes_[n].feat[1] = feat[1];
                     nodes_[n].feat[2] = feat[2];
                     nodes_[n].feat[3] = feat[3];
-		    nodes_[n].feat[4] = feat[4];
-		    nodes_[n].feat[5] = feat[5];
-					
+					nodes_[n].feat[4] = feat[4];
+					nodes_[n].feat[5] = feat[5];
+					/*nodes_[n].landmarkId[0] = markId[0];
+					nodes_[n].landmarkId[1] = markId[1];*/
                     nodes_[n].thresh  = thresh;
                     nodes_[n].issplit = true;
                     nodes_[n].isleafnode = false;
@@ -158,26 +161,40 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
 	for (int i=0;i < num_nodes_;i++){
 		if (nodes_[i].isleafnode == 1){
 			// compute leaf node's score
-			float leafy0=0;
-			float leafy1=0;
+			float leafy_pos_weight=0;
+			float leafy_neg_weight=0;
 			for (int j=0;j<nodes_[i].ind_samples.size();++j)
 			{
-				if (ground_truth_faces[nodes_[i].ind_samples[j]]==1)
+				if (find_times[augmented_images[nodes_[i].ind_samples[j]]]<=MAXFINDTIMES)
 				{
-					leafy0+=current_weight[nodes_[i].ind_samples[j]];
-				}
-				else
-				{
-					leafy1+=current_weight[nodes_[i].ind_samples[j]];
+					if (ground_truth_faces[nodes_[i].ind_samples[j]]==1)
+					{
+						leafy_pos_weight+=current_weight[nodes_[i].ind_samples[j]];
+					}
+					else
+					{
+						leafy_neg_weight+=current_weight[nodes_[i].ind_samples[j]];
+					}
 				}
 			}
-			// compute leaf node's score 
-			nodes_[i].score=0.5*(((leafy0-0.0)<FLT_EPSILON)?0:log(leafy0))-0.5*(((leafy1-0.0)<FLT_EPSILON)?0:log(leafy1));
+			//cout<<"leafy_pos_weight:"<<leafy_pos_weight<<" "<<"leafy_neg_weight:"<<leafy_neg_weight<<" ";
+			nodes_[i].score=0.5*(((leafy_pos_weight-0.0)<FLT_EPSILON)?0:log(leafy_pos_weight))-0.5*(((leafy_neg_weight-0.0)<FLT_EPSILON)?0:log(leafy_neg_weight))/*/log(2.0)*/;
+			//cout<<"score:"<<nodes_[i].score<<" "<<endl;
+			// compute leaf node's score
 			id_leafnodes_.push_back(i);
 		}
 	}
+	/*if (id_leafnodes_.size()<8)
+	{
+		cout<<"leaf num:"<<id_leafnodes_.size()<<endl;
+		system("pause");
+	}*/
+	
+	//cout<<endl;
+	//system("pause");
 }
 void Tree::Splitnode(const vector<Mat_<uchar> >& images,
+					 vector<int>& find_times,
 					 const vector<int>& augmented_images,
                      const vector<Mat_<float> >& ground_truth_shapes,
 					 const vector<int>& ground_truth_faces,
@@ -187,16 +204,24 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
                      const vector<BoundingBox> & bounding_box,
                      const Mat_<float>& mean_shape,
                      const Mat_<float>& shapes_residual,
-                     const vector<int> &ind_samples,
+                     const vector<int> &ind_samples_ori,
                      // output
                      float& thresh,
                      float* feat,
-					
+					 /*int* markId,*/
                      bool& isvaild,
                      vector<int>& lcind,
                      vector<int>& rcind,
 					 int stage
                      ){
+	vector<int> ind_samples;
+	for (int i=0;i<ind_samples_ori.size();++i)
+	{
+		if(find_times[augmented_images[ind_samples_ori[i]]]>MAXFINDTIMES)
+			continue;
+		else
+			ind_samples.push_back(ind_samples_ori[i]);
+	}
     if (ind_samples.size() == 0){
         thresh = 0;
         //feat = new float[4];
@@ -204,13 +229,14 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         feat[1] = 0;
         feat[2] = 0;
         feat[3] = 0;
-	feat[4]=0;
-	feat[5]=0;
+		feat[4] = 0;
+		feat[5] = 0;
         lcind.clear();
         rcind.clear();
         isvaild = 1;
         return;
     }
+	
     // get candidate pixel locations
     RNG random_generator(getTickCount());
     Mat_<float> candidate_pixel_locations(max_numfeats_,6);
@@ -220,7 +246,7 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         float x2 = random_generator.uniform(-1.0,1.0);
         float y2 = random_generator.uniform(-1.0,1.0);
         if((x1*x1 + y1*y1 > 1.0)||(x2*x2 + y2*y2 > 1.0)){
-            i--;  // garantee point is on the side of a circle
+            i--;
             continue;
         }
        // cout << x1 << " "<<y1 <<" "<< x2<<" "<< y2<<endl;
@@ -228,10 +254,16 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         candidate_pixel_locations(i,1) = y1 * max_radio_radius_;
         candidate_pixel_locations(i,2) = x2 * max_radio_radius_;
         candidate_pixel_locations(i,3) = y2 * max_radio_radius_;
-	candidate_pixel_locations(i,4) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
-	candidate_pixel_locations(i,5) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
+		/*candidate_pixel_locations(i,4) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
+		candidate_pixel_locations(i,5) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);*/
+		int tmp_idx=(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
+		candidate_pixel_locations(i,4) =tmp_idx;
+		candidate_pixel_locations(i,5) =tmp_idx;
     }
+	// get landmark
 	
+	/*markId[0]=landmarkID_;
+	markId[1]=landmarkID_;*/
     // get pixel difference feature
     Mat_<int> densities(max_numfeats_,(int)ind_samples.size());
 	#pragma omp parallel for
@@ -242,7 +274,8 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         SimilarityTransform(temp,mean_shape,rotation,scale);
         // whether transpose or not ????
 		
-        for(int j = 0;j < max_numfeats_;j++){
+        for(int j = 0;j < max_numfeats_;j++)
+		{
             float project_x1 = rotation(0,0) * candidate_pixel_locations(j,0) + rotation(0,1) * candidate_pixel_locations(j,1);
             float project_y1 = rotation(1,0) * candidate_pixel_locations(j,0) + rotation(1,1) * candidate_pixel_locations(j,1);
             project_x1 = scale * project_x1 * bounding_box[ind_samples[i]].width / 2.0;
@@ -267,202 +300,213 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
     // pick the feature
     Mat_<int> densities_sorted = densities.clone();
     cv::sort(densities, densities_sorted, CV_SORT_ASCENDING);
-    //separate shape samples from all
-    vector<int> ind_samples_shape;
-    for(int n=0;n<ind_samples.size();++n)
-    {
-    	if (ground_truth_faces[ind_samples[n]]==1)
+	
+	//separate shape samples
+	vector<int> ind_samples_shape;
+	for(int n=0;n<ind_samples.size();++n)
 	{
-		ind_samples_shape.push_back(ind_samples[n]);
-	} 
-    	
-    }
-    Mat_<float> shapes_residual_shape(ind_samples_shape.size(),2);
-    //#pragma omp parallel for
-    for(int n=0,m=0;n<ind_samples.size();++n)
-    {
-	if (ground_truth_faces[ind_samples[n]]==1)
+		if (ground_truth_faces[ind_samples[n]]==1)
+		{
+			ind_samples_shape.push_back(ind_samples[n]);
+		} 
+	}
+	Mat_<float> shapes_residual_shape(ind_samples_shape.size(),2);
+	//#pragma omp parallel for
+	for(int n=0,m=0;n<ind_samples.size();++n)
 	{
-		shapes_residual_shape(m,0)=shapes_residual(ind_samples[n],0);
-		shapes_residual_shape(m,1)=shapes_residual(ind_samples[n],1);
-		++m;
-	} 
-    }
-    // threshold about shape
-    float var_overall =(calculate_var(shapes_residual_shape.col(0))+calculate_var(shapes_residual_shape.col(1))) * ind_samples_shape.size();
-    Mat_<float> table_shape(max_numfeats_,2);
-    Mat_<float> table_face(max_numfeats_,2);
-    #pragma omp parallel for
+		if (ground_truth_faces[ind_samples[n]]==1)
+		{
+			shapes_residual_shape(m,0)=shapes_residual(ind_samples[n],0);
+			shapes_residual_shape(m,1)=shapes_residual(ind_samples[n],1);
+			++m;
+		} 
+	}
+	// threshold about shape
+	float var_overall =(calculate_var(shapes_residual_shape.col(0))+calculate_var(shapes_residual_shape.col(1))) * ind_samples_shape.size();
+	
+	Mat_<float> cache_shape(max_numfeats_,2);
+	Mat_<float> cache_face(max_numfeats_,2);
+	#pragma omp parallel for
     for (int i = 0;i <max_numfeats_;i++){
-	vector<float> lc1_shape,lc2_shape;
-	vector<float> rc1_shape,rc2_shape;
-	lc1_shape.reserve(ind_samples.size());
-	lc2_shape.reserve(ind_samples.size());
-	rc1_shape.reserve(ind_samples.size());
-	rc2_shape.reserve(ind_samples.size());
+		vector<float> lc1_shape,lc2_shape;
+		vector<float> rc1_shape,rc2_shape;
+		lc1_shape.reserve(ind_samples.size());
+		lc2_shape.reserve(ind_samples.size());
+		rc1_shape.reserve(ind_samples.size());
+		rc2_shape.reserve(ind_samples.size());
 		
-	vector<float> lc1_weight,lc2_weight;
-	vector<float> rc1_weight,rc2_weight;
-	lc1_weight.reserve(ind_samples.size());
-	lc2_weight.reserve(ind_samples.size());
-	rc1_weight.reserve(ind_samples.size());
-	rc2_weight.reserve(ind_samples.size());
+		vector<float> lc_pos_weight,lc_neg_weight;
+		vector<float> rc_pos_weight,rc_neg_weight;
+		lc_pos_weight.reserve(ind_samples.size());
+		lc_neg_weight.reserve(ind_samples.size());
+		rc_pos_weight.reserve(ind_samples.size());
+		rc_neg_weight.reserve(ind_samples.size());
 
-	lc1_shape.clear();
-	lc2_shape.clear();
-	rc1_shape.clear();
-	rc2_shape.clear();
-	lc1_weight.clear();
-	lc2_weight.clear();
-	rc1_weight.clear();
-	rc2_weight.clear();
+		lc1_shape.clear();
+		lc2_shape.clear();
+		rc1_shape.clear();
+		rc2_shape.clear();
+		lc_pos_weight.clear();
+		lc_neg_weight.clear();
+		rc_pos_weight.clear();
+		rc_neg_weight.clear();
 
-	float total_lc1_weight=0,total_lc2_weight=0;
-	float total_rc1_weight=0,total_rc2_weight=0;
-	RNG random_generator2(getTickCount());
+		float total_lc_pos_weight=0,total_lc_neg_weight=0;
+		float total_rc_pos_weight=0,total_rc_neg_weight=0;
+		
+		RNG random_generator2(getTickCount());
         int ind =(int)(ind_samples.size() * random_generator2.uniform(0.05,0.95));
         float threshold = densities_sorted(i,ind);
         for (int j=0;j < ind_samples.size();j++){
             if (densities(i,j) < threshold){
-		if(ground_truth_faces[ind_samples[j]]==1)
-		{
-			lc1_shape.push_back(shapes_residual(ind_samples[j],0));
-			lc2_shape.push_back(shapes_residual(ind_samples[j],1));
+				if(ground_truth_faces[ind_samples[j]]==1)
+				{
+					lc1_shape.push_back(shapes_residual(ind_samples[j],0));
+					lc2_shape.push_back(shapes_residual(ind_samples[j],1));
 					
-			lc1_weight.push_back(current_weight[ind_samples[j]]);
-			total_lc1_weight+=current_weight[ind_samples[j]];
-		}
-		else
-		{
-			lc2_weight.push_back(current_weight[ind_samples[j]]);
-			total_lc2_weight+=current_weight[ind_samples[j]];
-		}
+					lc_pos_weight.push_back(current_weight[ind_samples[j]]);
+					total_lc_pos_weight+=current_weight[ind_samples[j]];
+				}
+				else
+				{
+					lc_neg_weight.push_back(current_weight[ind_samples[j]]);
+					total_lc_neg_weight+=current_weight[ind_samples[j]];
+				}
             }
             else{
-			if(ground_truth_faces[ind_samples[j]]==1)
-			{
-				rc1_shape.push_back(shapes_residual(ind_samples[j],0));
-				rc2_shape.push_back(shapes_residual(ind_samples[j],1)); 
+				if(ground_truth_faces[ind_samples[j]]==1)
+				{
+					rc1_shape.push_back(shapes_residual(ind_samples[j],0));
+					rc2_shape.push_back(shapes_residual(ind_samples[j],1)); 
 					
-				rc1_weight.push_back(current_weight[ind_samples[j]]);
-				total_rc1_weight+=current_weight[ind_samples[j]];
+					rc_pos_weight.push_back(current_weight[ind_samples[j]]);
+					total_rc_pos_weight+=current_weight[ind_samples[j]];
+				}
+				else
+				{
+					rc_neg_weight.push_back(current_weight[ind_samples[j]]);
+					total_rc_neg_weight+=current_weight[ind_samples[j]];
+				}        
 			}
-			else
-			{
-				rc2_weight.push_back(current_weight[ind_samples[j]]);
-				total_rc2_weight+=current_weight[ind_samples[j]];
-			}        
-		}
         }
-	// about shape
-	float var_lc = (calculate_var(lc1_shape)+calculate_var(lc2_shape)) * lc1_shape.size();
-	float var_rc = (calculate_var(rc1_shape)+calculate_var(rc2_shape)) * rc1_shape.size();
+		// about shape
+		float var_lc = (calculate_var(lc1_shape)+calculate_var(lc2_shape)) * lc1_shape.size();
+		float var_rc = (calculate_var(rc1_shape)+calculate_var(rc2_shape)) * rc1_shape.size();
         float var_reduce = var_overall - var_lc - var_rc;
-	table_shape(i,0)=var_reduce;
-	table_shape(i,1)=threshold;
+		cache_shape(i,0)=var_reduce;
+		cache_shape(i,1)=threshold;
 
-	// about face
+		// about face
 		
-	float total_sample =	lc1_weight.size()+lc2_weight.size()+rc1_weight.size()+rc2_weight.size();
-	float left_sample  =	lc1_weight.size()+lc2_weight.size();
-	float right_sample =	rc1_weight.size()+rc2_weight.size(); 
+		int total_sample_num = lc_pos_weight.size()+lc_neg_weight.size()+rc_pos_weight.size()+rc_neg_weight.size();
+		int left_sample_num  = lc_pos_weight.size()+lc_neg_weight.size();
+		int right_sample_num = rc_pos_weight.size()+rc_neg_weight.size(); 
 
-	float entropy=0;
-	float lc_entropy=0;
-	float rc_entropy=0;
+		float total_weight = total_lc_pos_weight + total_lc_neg_weight + total_rc_pos_weight + total_rc_neg_weight;
+		float total_lc_weight = total_lc_pos_weight + total_lc_neg_weight;
+		float total_rc_weight = total_rc_pos_weight + total_rc_neg_weight;
 
-	if ((total_sample-0.0)<FLT_EPSILON)
-	{
-		lc_entropy=0;
-		rc_entropy=0;
-	}
-	else
-	{
-		if ((left_sample-0.0)<FLT_EPSILON)
+		float entropy=0;
+		float lc_entropy=0;
+		float rc_entropy=0;
+
+		if (total_sample_num==0)
 		{
 			lc_entropy=0;
-		}
-		else
-		{
-			float entropy_tmp = total_lc1_weight/(total_lc1_weight+total_lc2_weight+FLT_MIN);
-			if ((entropy_tmp-0.0)<FLT_EPSILON)
-			{
-				lc_entropy=0;
-			} 
-			else
-			{
-				lc_entropy = -((total_lc1_weight+total_lc2_weight)/(total_lc1_weight+total_lc2_weight+total_rc1_weight+total_rc2_weight+FLT_MIN))*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
-			}
-
-		}
-		if ((right_sample-0.0)<FLT_EPSILON)
-		{
 			rc_entropy=0;
 		}
 		else
 		{
-			float entropy_tmp = total_rc1_weight/(total_rc1_weight+total_rc2_weight+FLT_MIN);
-			if ((entropy_tmp-0.0)<FLT_EPSILON)
+			if (left_sample_num==0)
 			{
-				rc_entropy=0;
-			} 
+				lc_entropy=0;
+			}
 			else
 			{
-				rc_entropy = -((total_rc1_weight+total_rc2_weight)/(total_lc1_weight+total_lc2_weight+total_rc1_weight+total_rc2_weight+FLT_MIN))*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+				float entropy_tmp = total_lc_pos_weight / (total_lc_weight + FLT_MIN);
+				//float entropy_tmp = lc_pos_weight.size()/(lc_pos_weight.size()+lc_neg_weight.size()+FLT_MIN);
+				if ((entropy_tmp-0.0)<FLT_EPSILON)
+				{
+					lc_entropy=0;
+				} 
+				else
+				{
+					lc_entropy = -(total_lc_weight / (total_weight + FLT_MIN))*((entropy_tmp + FLT_MIN)*log(entropy_tmp + FLT_MIN) / log(2.0) + (1 - entropy_tmp + FLT_MIN)*log(1 - entropy_tmp + FLT_MIN) / log(2.0));
+					//lc_entropy = -(left_sample_num/total_sample_num)*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+					//lc_entropy = -/*(left_sample_num/total_sample_num)**/((total_lc_pos_weight/*/(total_lc_pos_weight+total_lc_neg_weight+FLT_MIN)*/)*(entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(total_lc_neg_weight/*/(total_lc_pos_weight+total_lc_neg_weight+FLT_MIN)*/)*(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+				}
+
+			}
+			if (right_sample_num==0)
+			{
+				rc_entropy=0;
+			}
+			else
+			{
+				float entropy_tmp = total_rc_pos_weight/(total_rc_weight+FLT_MIN);
+				//float entropy_tmp = rc_pos_weight.size()/(rc_pos_weight.size()+rc_neg_weight.size()+FLT_MIN);
+				if ((entropy_tmp-0.0)<FLT_EPSILON)
+				{
+					rc_entropy=0;
+				} 
+				else
+				{
+					rc_entropy = -(total_rc_weight / (total_weight + FLT_MIN))*((entropy_tmp + FLT_MIN)*log(entropy_tmp + FLT_MIN) / log(2.0) + (1 - entropy_tmp + FLT_MIN)*log(1 - entropy_tmp + FLT_MIN) / log(2.0));
+					//rc_entropy = -(right_sample_num/total_sample_num)*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+					//rc_entropy = -/*(right_sample_num/total_sample_num)**/((total_rc_pos_weight/*/(total_rc_pos_weight+total_rc_neg_weight+FLT_MIN)*/)*(entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(total_rc_neg_weight/*/(total_rc_pos_weight+total_rc_neg_weight+FLT_MIN)*/)*(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+				}
 			}
 		}
-	}
-	entropy=lc_entropy+rc_entropy;
-	table_face(i,0)=entropy;
-	table_face(i,1)=threshold;
+		entropy=lc_entropy+rc_entropy;
+		cache_face(i,0)=entropy;
+		cache_face(i,1)=threshold;
     }
-    float thresh_shape=0;
-    float thresh_face=0;
+	float thresh_shape=0;
+	float thresh_face=0;
 
     float max_id_shape = 0;
-    float max_id_face=0;
-    float max_var_reductions = 0;
-    float min_entropy=FLT_MAX;
-    
-    for (int i=0;i<table_shape.rows;++i)
-    {
-	if (table_shape(i,0) > max_var_reductions){
-		max_var_reductions = table_shape(i,0);
-		thresh_shape = table_shape(i,1);
-		max_id_shape = i;
+	float max_id_face=0;
+
+	float max_var_reductions = 0;
+	float min_entropy=FLT_MAX;
+	
+	for (int i=0;i<cache_shape.rows;++i)
+	{
+		if (cache_shape(i,0) > max_var_reductions){
+			max_var_reductions = cache_shape(i,0);
+			thresh_shape = cache_shape(i,1);
+			max_id_shape = i;
+		}
 	}
-    	
-    }
-    for (int i=0;i<table_face.rows;++i)
-    {
-	if (table_face(i,0) < min_entropy){
-		min_entropy = table_face(i,0);
-		thresh_face = table_face(i,1);
-		max_id_face = i;
+	for (int i=0;i<cache_face.rows;++i)
+	{
+		if (cache_face(i,0) < min_entropy){
+			min_entropy = cache_face(i,0);
+			thresh_face = cache_face(i,1);
+			max_id_face = i;
+		}
 	}
-    	
-    }
-    int max_id=0;
-    if(random_generator.uniform(0.0,1.0)<max_probility_)
-    {
-	thresh=thresh_face;
-	max_id=max_id_face;
-    	
-    }
-    else
-    {
-	thresh=thresh_shape;
-	max_id=max_id_shape;
-    }
+	int max_id=0;
+	if(random_generator.uniform(0.0,1.0)<max_probility_)
+	{
+		thresh=thresh_face;
+		max_id=max_id_face;
+	}
+	else
+	{
+		thresh=thresh_shape;
+		max_id=max_id_shape;
+	}
 
     isvaild = 1;
     feat[0] =candidate_pixel_locations(max_id,0)/*/max_radio_radius_*/;
     feat[1] =candidate_pixel_locations(max_id,1)/*/max_radio_radius_*/;
     feat[2] =candidate_pixel_locations(max_id,2)/*/max_radio_radius_*/;
     feat[3] =candidate_pixel_locations(max_id,3)/*/max_radio_radius_*/;
-    feat[4] =candidate_pixel_locations(max_id,4);
-    feat[5] =candidate_pixel_locations(max_id,5);
-
+	feat[4] =candidate_pixel_locations(max_id,4);
+	feat[5] =candidate_pixel_locations(max_id,5);
+//    cout << max_id<< " "<<max_var_reductions <<endl;
+//    cout << feat[0] << " "<<feat[1] <<" "<< feat[2]<<" "<< feat[3]<<endl;
     lcind.clear();
     rcind.clear();
 	
