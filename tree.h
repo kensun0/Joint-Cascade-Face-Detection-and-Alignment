@@ -1,11 +1,3 @@
-//
-//  Tree.h
-//  myopencv
-//
-//  Created by lequan on 1/23/15.
-//  Copyright (c) 2015 lequan. All rights reserved.
-//
-
 #ifndef __myopencv__Tree__
 #define __myopencv__Tree__
 
@@ -106,13 +98,12 @@ public:
 		threshold = 0;
     }
     void Train(const std::vector<cv::Mat_<uchar> >& images,
-			   std::vector<int>& find_times,
 		       const std::vector<int>& augmented_images,
                const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 			   const std::vector<int>& ground_truth_faces,
                const std::vector<cv::Mat_<float> >& current_shapes,
 			   const std::vector<float>& current_fi,
-			   const std::vector<float>& current_weight,
+			   const std::vector<double>& current_weight,
                const std::vector<BoundingBox> & bounding_boxs,
                const cv::Mat_<float>& mean_shape,
                const std::vector<cv::Mat_<float> >& regression_targets,
@@ -123,13 +114,12 @@ public:
     
     //Splite the node
     void Splitnode(const std::vector<cv::Mat_<uchar> >& images,
-		           std::vector<int>& find_times,
 				   const std::vector<int>& augmented_images,
                    const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 				   const std::vector<int>& ground_truth_faces,
                    const std::vector<cv::Mat_<float> >& current_shapes,
 				   const std::vector<float>& current_fi,
-				   const std::vector<float>& current_weight,
+				   const std::vector<double>& current_weight,
                    const std::vector<BoundingBox> & bounding_box,
                    const cv::Mat_<float>& mean_shape,
                    const cv::Mat_<float>& shapes_residual,
@@ -137,7 +127,7 @@ public:
                    // output
                    float& thresh,
                    float* feat,
-				   //int* markId,
+				   int landmarkID,
                    bool& isvaild,
                    std::vector<int>& lcind,
                    std::vector<int>& rcind,
