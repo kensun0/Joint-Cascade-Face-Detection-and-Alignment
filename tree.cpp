@@ -31,13 +31,12 @@ inline float calculate_var(const Mat_<float>& v1){
 }
 
 void Tree::Train(const vector<Mat_<uchar> >& images,
-				 vector<int>& find_times,
 				 const vector<int>& augmented_images,
                  const vector<Mat_<float> >& ground_truth_shapes,
 				 const vector<int>& ground_truth_faces,
                  const vector<Mat_<float> >& current_shapes,
 				 const vector<float>& current_fi,
-				 const vector<float>& current_weight,
+				 const vector<double>& current_weight,
                  const vector<BoundingBox> & bounding_boxs,
                  const Mat_<float>& mean_shape,
                  const vector<Mat_<float> >& regression_targets,
@@ -52,7 +51,6 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
 	max_probility_ = global_params.max_probility[stages];
     num_nodes_ = 1;
     num_leafnodes_ = 1;
-    
     // index: indicate the training samples id in images
     int num_nodes_iter;
     int num_split;
@@ -73,8 +71,6 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
     for (int i=0; i < 6;i++){
         nodes_[0].feat[i] = 1;
     }
-	/*nodes_[0].landmarkId[0]=0;
-	nodes_[0].landmarkId[1]=0;*/
     nodes_[0].ind_samples = index;
     nodes_[0].score=0;
 
@@ -83,7 +79,6 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
     int num_leafnodes = 1;
     float thresh;
     float feat[6];
-	//int markId[2];
     bool isvaild;
     vector<int> lcind,rcind;
     lcind.reserve(index.size());
@@ -101,8 +96,9 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
                 }
                 else {
                     // separate the samples into left and right path
-                    Splitnode(images,find_times,augmented_images,ground_truth_shapes,ground_truth_faces,current_shapes,current_fi,current_weight,bounding_boxs,mean_shape,shapes_residual,
-						nodes_[n].ind_samples,thresh, feat,/*markId, */isvaild,lcind,rcind,stages);
+                    Splitnode(images,augmented_images,ground_truth_shapes,ground_truth_faces,
+						current_shapes,current_fi,current_weight,bounding_boxs,mean_shape,shapes_residual,
+						nodes_[n].ind_samples,thresh, feat, landmarkID_, isvaild,lcind,rcind,stages);
                     // set the threshold and featture for current node
                     nodes_[n].feat[0] = feat[0];
                     nodes_[n].feat[1] = feat[1];
@@ -110,14 +106,11 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
                     nodes_[n].feat[3] = feat[3];
 					nodes_[n].feat[4] = feat[4];
 					nodes_[n].feat[5] = feat[5];
-					/*nodes_[n].landmarkId[0] = markId[0];
-					nodes_[n].landmarkId[1] = markId[1];*/
                     nodes_[n].thresh  = thresh;
                     nodes_[n].issplit = true;
                     nodes_[n].isleafnode = false;
                     nodes_[n].cnodes[0] = num_nodes ;
                     nodes_[n].cnodes[1] = num_nodes +1;
-                    
                     //add left and right child nodes into the random tree
                     nodes_[num_nodes].ind_samples = lcind;
                     nodes_[num_nodes].issplit = false;
@@ -126,7 +119,6 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
                     nodes_[num_nodes].cnodes[0] = 0;
                     nodes_[num_nodes].cnodes[1] = 0;
                     nodes_[num_nodes].isleafnode = true;
-
                     nodes_[num_nodes +1].ind_samples = rcind;
                     nodes_[num_nodes +1].issplit = false;
                     nodes_[num_nodes +1].pnode = n;
@@ -134,14 +126,11 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
                     nodes_[num_nodes +1].cnodes[0] = 0;
                     nodes_[num_nodes +1].cnodes[1] = 0;
                     nodes_[num_nodes +1].isleafnode = true;
-                    
                     num_split++;
                     num_leafnodes++;
                     num_nodes +=2;
                 }
-            }
-            
-            
+            }    
         }
         if (num_split == 0){
             stop = 1;
@@ -151,13 +140,8 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
             num_leafnodes_ = num_leafnodes;
         }
     }
-    
     id_leafnodes_.clear();
-    /*for (int i=0;i < num_nodes_;i++){
-        if (nodes_[i].isleafnode == 1){
-            id_leafnodes_.push_back(i);
-        }
-    }*/
+   
 	for (int i=0;i < num_nodes_;i++){
 		if (nodes_[i].isleafnode == 1){
 			// compute leaf node's score
@@ -165,42 +149,47 @@ void Tree::Train(const vector<Mat_<uchar> >& images,
 			float leafy_neg_weight=0;
 			for (int j=0;j<nodes_[i].ind_samples.size();++j)
 			{
-				if (find_times[augmented_images[nodes_[i].ind_samples[j]]]<=MAXFINDTIMES)
+				if (ground_truth_faces[nodes_[i].ind_samples[j]]==1)
 				{
-					if (ground_truth_faces[nodes_[i].ind_samples[j]]==1)
-					{
-						leafy_pos_weight+=current_weight[nodes_[i].ind_samples[j]];
-					}
-					else
-					{
-						leafy_neg_weight+=current_weight[nodes_[i].ind_samples[j]];
-					}
+					leafy_pos_weight+=current_weight[nodes_[i].ind_samples[j]];
+				}
+				else
+				{
+					leafy_neg_weight+=current_weight[nodes_[i].ind_samples[j]];
 				}
 			}
-			//cout<<"leafy_pos_weight:"<<leafy_pos_weight<<" "<<"leafy_neg_weight:"<<leafy_neg_weight<<" ";
-			nodes_[i].score=0.5*(((leafy_pos_weight-0.0)<FLT_EPSILON)?0:log(leafy_pos_weight))-0.5*(((leafy_neg_weight-0.0)<FLT_EPSILON)?0:log(leafy_neg_weight))/*/log(2.0)*/;
-			//cout<<"score:"<<nodes_[i].score<<" "<<endl;
 			// compute leaf node's score
+			if ((leafy_pos_weight - 0.0) < DBL_EPSILON)
+			{
+				nodes_[i].score = -20;
+				printf("\nwarning1: leafnode has no pos sample\n");
+			}
+			if ((leafy_neg_weight - 0.0)<DBL_EPSILON)
+			{
+				nodes_[i].score = 20;
+				printf("\nwarning2: leafnode has no neg sample\n");
+			}
+			if ((leafy_neg_weight - 0.0) < DBL_EPSILON && (leafy_pos_weight - 0.0) < DBL_EPSILON)
+			{
+				nodes_[i].score = 0;
+				printf("\nwarning3: leafnode has no     sample\n");
+			}
+			if ((leafy_pos_weight - 0.0) > DBL_EPSILON && (leafy_neg_weight - 0.0) > DBL_EPSILON)
+			{
+				nodes_[i].score = 0.5*log(leafy_pos_weight/ leafy_neg_weight) / log(2.0f);
+			}
 			id_leafnodes_.push_back(i);
 		}
 	}
-	/*if (id_leafnodes_.size()<8)
-	{
-		cout<<"leaf num:"<<id_leafnodes_.size()<<endl;
-		system("pause");
-	}*/
-	
-	//cout<<endl;
-	//system("pause");
 }
+
 void Tree::Splitnode(const vector<Mat_<uchar> >& images,
-					 vector<int>& find_times,
 					 const vector<int>& augmented_images,
                      const vector<Mat_<float> >& ground_truth_shapes,
 					 const vector<int>& ground_truth_faces,
                      const vector<Mat_<float> >& current_shapes,
 					 const vector<float >& current_fi,
-					 const vector<float >& current_weight,
+					 const vector<double >& current_weight,
                      const vector<BoundingBox> & bounding_box,
                      const Mat_<float>& mean_shape,
                      const Mat_<float>& shapes_residual,
@@ -208,7 +197,7 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
                      // output
                      float& thresh,
                      float* feat,
-					 /*int* markId,*/
+					 int landmarkID,
                      bool& isvaild,
                      vector<int>& lcind,
                      vector<int>& rcind,
@@ -217,14 +206,10 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 	vector<int> ind_samples;
 	for (int i=0;i<ind_samples_ori.size();++i)
 	{
-		if(find_times[augmented_images[ind_samples_ori[i]]]>MAXFINDTIMES)
-			continue;
-		else
 			ind_samples.push_back(ind_samples_ori[i]);
 	}
     if (ind_samples.size() == 0){
         thresh = 0;
-        //feat = new float[4];
         feat[0] = 0;
         feat[1] = 0;
         feat[2] = 0;
@@ -236,7 +221,6 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         isvaild = 1;
         return;
     }
-	
     // get candidate pixel locations
     RNG random_generator(getTickCount());
     Mat_<float> candidate_pixel_locations(max_numfeats_,6);
@@ -246,24 +230,18 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         float x2 = random_generator.uniform(-1.0,1.0);
         float y2 = random_generator.uniform(-1.0,1.0);
         if((x1*x1 + y1*y1 > 1.0)||(x2*x2 + y2*y2 > 1.0)){
-            i--;
-            continue;
+            i--;continue;
         }
-       // cout << x1 << " "<<y1 <<" "<< x2<<" "<< y2<<endl;
         candidate_pixel_locations(i,0) = x1 * max_radio_radius_;
         candidate_pixel_locations(i,1) = y1 * max_radio_radius_;
         candidate_pixel_locations(i,2) = x2 * max_radio_radius_;
         candidate_pixel_locations(i,3) = y2 * max_radio_radius_;
-		/*candidate_pixel_locations(i,4) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
-		candidate_pixel_locations(i,5) =(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);*/
-		int tmp_idx=(int)random_generator.uniform(0.01,global_params.landmark_num-0.01);
-		candidate_pixel_locations(i,4) =tmp_idx;
-		candidate_pixel_locations(i,5) =tmp_idx;
+		/*int tmp_idx=(int)random_generator.uniform(0,global_params.landmark_num-1);
+		candidate_pixel_locations(i,4) = tmp_idx;
+		candidate_pixel_locations(i,5) = tmp_idx;*/
+		candidate_pixel_locations(i, 4) = landmarkID;
+		candidate_pixel_locations(i, 5) = landmarkID;
     }
-	// get landmark
-	
-	/*markId[0]=landmarkID_;
-	markId[1]=landmarkID_;*/
     // get pixel difference feature
     Mat_<int> densities(max_numfeats_,(int)ind_samples.size());
 	#pragma omp parallel for
@@ -272,8 +250,6 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
         float scale;
         Mat_<float> temp = ProjectShape(current_shapes[ind_samples[i]],bounding_box[ind_samples[i]]);
         SimilarityTransform(temp,mean_shape,rotation,scale);
-        // whether transpose or not ????
-		
         for(int j = 0;j < max_numfeats_;j++)
 		{
             float project_x1 = rotation(0,0) * candidate_pixel_locations(j,0) + rotation(0,1) * candidate_pixel_locations(j,1);
@@ -284,7 +260,6 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
             int real_y1 = project_y1 + current_shapes[ind_samples[i]](candidate_pixel_locations(j,4),1);
             real_x1 = max(0.0,min((double)real_x1,images[augmented_images[ind_samples[i]]].cols-1.0));
 			real_y1 = max(0.0,min((double)real_y1,images[augmented_images[ind_samples[i]]].rows-1.0));
-            
             float project_x2 = rotation(0,0) * candidate_pixel_locations(j,2) + rotation(0,1) * candidate_pixel_locations(j,3);
             float project_y2 = rotation(1,0) * candidate_pixel_locations(j,2) + rotation(1,1) * candidate_pixel_locations(j,3);
             project_x2 = scale * project_x2 * bounding_box[ind_samples[i]].width / 2.0;
@@ -293,14 +268,12 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
             int real_y2 = project_y2 + current_shapes[ind_samples[i]](candidate_pixel_locations(j,5),1);
             real_x2 = max(0.0,min((double)real_x2,images[augmented_images[ind_samples[i]]].cols-1.0));
             real_y2 = max(0.0,min((double)real_y2,images[augmented_images[ind_samples[i]]].rows-1.0));
-            
             densities(j,i) = ((int)(images[augmented_images[ind_samples[i]]](real_y1,real_x1))-(int)(images[augmented_images[ind_samples[i]]](real_y2,real_x2)));
         }
     }
     // pick the feature
     Mat_<int> densities_sorted = densities.clone();
     cv::sort(densities, densities_sorted, CV_SORT_ASCENDING);
-	
 	//separate shape samples
 	vector<int> ind_samples_shape;
 	for(int n=0;n<ind_samples.size();++n)
@@ -311,7 +284,6 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 		} 
 	}
 	Mat_<float> shapes_residual_shape(ind_samples_shape.size(),2);
-	//#pragma omp parallel for
 	for(int n=0,m=0;n<ind_samples.size();++n)
 	{
 		if (ground_truth_faces[ind_samples[n]]==1)
@@ -335,8 +307,8 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 		rc1_shape.reserve(ind_samples.size());
 		rc2_shape.reserve(ind_samples.size());
 		
-		vector<float> lc_pos_weight,lc_neg_weight;
-		vector<float> rc_pos_weight,rc_neg_weight;
+		vector<double> lc_pos_weight,lc_neg_weight;
+		vector<double> rc_pos_weight,rc_neg_weight;
 		lc_pos_weight.reserve(ind_samples.size());
 		lc_neg_weight.reserve(ind_samples.size());
 		rc_pos_weight.reserve(ind_samples.size());
@@ -351,8 +323,8 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 		rc_pos_weight.clear();
 		rc_neg_weight.clear();
 
-		float total_lc_pos_weight=0,total_lc_neg_weight=0;
-		float total_rc_pos_weight=0,total_rc_neg_weight=0;
+		double total_lc_pos_weight=0,total_lc_neg_weight=0;
+		double total_rc_pos_weight=0,total_rc_neg_weight=0;
 		
 		RNG random_generator2(getTickCount());
         int ind =(int)(ind_samples.size() * random_generator2.uniform(0.05,0.95));
@@ -363,14 +335,19 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 				{
 					lc1_shape.push_back(shapes_residual(ind_samples[j],0));
 					lc2_shape.push_back(shapes_residual(ind_samples[j],1));
-					
-					lc_pos_weight.push_back(current_weight[ind_samples[j]]);
-					total_lc_pos_weight+=current_weight[ind_samples[j]];
+					if (current_weight[ind_samples[j]] > FRAC)
+					{
+						lc_pos_weight.push_back(current_weight[ind_samples[j]]);
+						total_lc_pos_weight += current_weight[ind_samples[j]];
+					}
 				}
 				else
 				{
-					lc_neg_weight.push_back(current_weight[ind_samples[j]]);
-					total_lc_neg_weight+=current_weight[ind_samples[j]];
+					if (current_weight[ind_samples[j]] > FRAC)
+					{
+						lc_neg_weight.push_back(current_weight[ind_samples[j]]);
+						total_lc_neg_weight += current_weight[ind_samples[j]];
+					}
 				}
             }
             else{
@@ -379,13 +356,19 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 					rc1_shape.push_back(shapes_residual(ind_samples[j],0));
 					rc2_shape.push_back(shapes_residual(ind_samples[j],1)); 
 					
-					rc_pos_weight.push_back(current_weight[ind_samples[j]]);
-					total_rc_pos_weight+=current_weight[ind_samples[j]];
+					if (current_weight[ind_samples[j]] > FRAC)
+					{
+						rc_pos_weight.push_back(current_weight[ind_samples[j]]);
+						total_rc_pos_weight += current_weight[ind_samples[j]];
+					}
 				}
 				else
 				{
-					rc_neg_weight.push_back(current_weight[ind_samples[j]]);
-					total_rc_neg_weight+=current_weight[ind_samples[j]];
+					if (current_weight[ind_samples[j]] > FRAC)
+					{
+						rc_neg_weight.push_back(current_weight[ind_samples[j]]);
+						total_rc_neg_weight += current_weight[ind_samples[j]];
+					}
 				}        
 			}
         }
@@ -397,79 +380,69 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
 		cache_shape(i,1)=threshold;
 
 		// about face
-		
 		int total_sample_num = lc_pos_weight.size()+lc_neg_weight.size()+rc_pos_weight.size()+rc_neg_weight.size();
 		int left_sample_num  = lc_pos_weight.size()+lc_neg_weight.size();
 		int right_sample_num = rc_pos_weight.size()+rc_neg_weight.size(); 
 
-		float total_weight = total_lc_pos_weight + total_lc_neg_weight + total_rc_pos_weight + total_rc_neg_weight;
-		float total_lc_weight = total_lc_pos_weight + total_lc_neg_weight;
-		float total_rc_weight = total_rc_pos_weight + total_rc_neg_weight;
+		double total_weight = total_lc_pos_weight + total_lc_neg_weight + total_rc_pos_weight + total_rc_neg_weight;
+		double total_lc_weight = total_lc_pos_weight + total_lc_neg_weight;
+		double total_rc_weight = total_rc_pos_weight + total_rc_neg_weight;
 
-		float entropy=0;
-		float lc_entropy=0;
-		float rc_entropy=0;
+		double entropy=0;
+		double lc_entropy=0;
+		double rc_entropy=0;
 
 		if (total_sample_num==0)
 		{
-			lc_entropy=0;
-			rc_entropy=0;
+			lc_entropy= FLT_MAX;
+			rc_entropy= FLT_MAX;
 		}
 		else
 		{
 			if (left_sample_num==0)
 			{
-				lc_entropy=0;
+				lc_entropy= 0;
 			}
 			else
 			{
-				float entropy_tmp = total_lc_pos_weight / (total_lc_weight + FLT_MIN);
-				//float entropy_tmp = lc_pos_weight.size()/(lc_pos_weight.size()+lc_neg_weight.size()+FLT_MIN);
-				if ((entropy_tmp-0.0)<FLT_EPSILON)
+				float entropy_tmp = total_lc_pos_weight / (total_lc_weight + DBL_MIN);
+				if ((entropy_tmp-0.0)<DBL_EPSILON)
 				{
-					lc_entropy=0;
+					lc_entropy= 0;
 				} 
 				else
 				{
-					lc_entropy = -(total_lc_weight / (total_weight + FLT_MIN))*((entropy_tmp + FLT_MIN)*log(entropy_tmp + FLT_MIN) / log(2.0) + (1 - entropy_tmp + FLT_MIN)*log(1 - entropy_tmp + FLT_MIN) / log(2.0));
-					//lc_entropy = -(left_sample_num/total_sample_num)*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
-					//lc_entropy = -/*(left_sample_num/total_sample_num)**/((total_lc_pos_weight/*/(total_lc_pos_weight+total_lc_neg_weight+FLT_MIN)*/)*(entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(total_lc_neg_weight/*/(total_lc_pos_weight+total_lc_neg_weight+FLT_MIN)*/)*(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+					lc_entropy = -(total_lc_weight / (total_weight + DBL_MIN))*((entropy_tmp + DBL_MIN)*log(entropy_tmp + DBL_MIN) / log(2.0) + (1 - entropy_tmp + DBL_MIN)*log(1 - entropy_tmp + DBL_MIN) / log(2.0));
 				}
-
 			}
 			if (right_sample_num==0)
 			{
-				rc_entropy=0;
+				rc_entropy= 0;
 			}
 			else
 			{
-				float entropy_tmp = total_rc_pos_weight/(total_rc_weight+FLT_MIN);
-				//float entropy_tmp = rc_pos_weight.size()/(rc_pos_weight.size()+rc_neg_weight.size()+FLT_MIN);
-				if ((entropy_tmp-0.0)<FLT_EPSILON)
+				float entropy_tmp = total_rc_pos_weight/(total_rc_weight+ DBL_MIN);
+				if ((entropy_tmp-0.0)<DBL_EPSILON)
 				{
-					rc_entropy=0;
+					rc_entropy= 0;
 				} 
 				else
 				{
-					rc_entropy = -(total_rc_weight / (total_weight + FLT_MIN))*((entropy_tmp + FLT_MIN)*log(entropy_tmp + FLT_MIN) / log(2.0) + (1 - entropy_tmp + FLT_MIN)*log(1 - entropy_tmp + FLT_MIN) / log(2.0));
-					//rc_entropy = -(right_sample_num/total_sample_num)*((entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
-					//rc_entropy = -/*(right_sample_num/total_sample_num)**/((total_rc_pos_weight/*/(total_rc_pos_weight+total_rc_neg_weight+FLT_MIN)*/)*(entropy_tmp+FLT_MIN)*log(entropy_tmp+FLT_MIN)/log(2.0)+(total_rc_neg_weight/*/(total_rc_pos_weight+total_rc_neg_weight+FLT_MIN)*/)*(1-entropy_tmp+FLT_MIN)*log(1-entropy_tmp+FLT_MIN)/log(2.0));
+					rc_entropy = -(total_rc_weight / (total_weight + DBL_MIN))*((entropy_tmp + DBL_MIN)*log(entropy_tmp + DBL_MIN) / log(2.0) + (1 - entropy_tmp + DBL_MIN)*log(1 - entropy_tmp + DBL_MIN) / log(2.0));
 				}
 			}
 		}
-		entropy=lc_entropy+rc_entropy;
-		cache_face(i,0)=entropy;
-		cache_face(i,1)=threshold;
+		entropy = lc_entropy + rc_entropy;
+		
+		cache_face(i,0) = entropy;
+		cache_face(i,1) = threshold;
     }
 	float thresh_shape=0;
 	float thresh_face=0;
-
     float max_id_shape = 0;
 	float max_id_face=0;
-
 	float max_var_reductions = 0;
-	float min_entropy=FLT_MAX;
-	
+	double min_entropy=DBL_MAX;
 	for (int i=0;i<cache_shape.rows;++i)
 	{
 		if (cache_shape(i,0) > max_var_reductions){
@@ -505,8 +478,7 @@ void Tree::Splitnode(const vector<Mat_<uchar> >& images,
     feat[3] =candidate_pixel_locations(max_id,3)/*/max_radio_radius_*/;
 	feat[4] =candidate_pixel_locations(max_id,4);
 	feat[5] =candidate_pixel_locations(max_id,5);
-//    cout << max_id<< " "<<max_var_reductions <<endl;
-//    cout << feat[0] << " "<<feat[1] <<" "<< feat[2]<<" "<< feat[3]<<endl;
+
     lcind.clear();
     rcind.clear();
 	
