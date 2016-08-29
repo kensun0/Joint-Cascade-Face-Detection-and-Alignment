@@ -33,15 +33,13 @@ public:
             rfs_[i].resize(max_numtrees_);
         }
     }
-    void Train(const std::vector<cv::Mat_<uchar> >& images,
-		       std::vector<cv::Mat_<uchar> >& scale_map,
-			   std::vector<int>& find_times,
-			   const std::vector<int>& augmented_images,
+    void Train(std::vector<cv::Mat_<uchar> >& images,
+			   std::vector<int>& augmented_images,
                std::vector<cv::Mat_<float> >& ground_truth_shapes,
 			   std::vector<int>& ground_truth_faces,
                std::vector<cv::Mat_<float> >& current_shapes,
 			   std::vector<float>& current_fi,
-			   std::vector<float>& current_weight,
+			   std::vector<double>& current_weight,
                std::vector<BoundingBox> & bounding_boxs,
                const cv::Mat_<float>& mean_shape,
                std::vector<cv::Mat_<float> >& shapes_residual,
