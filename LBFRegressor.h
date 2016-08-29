@@ -1,11 +1,3 @@
-//
-//  LBFRegressor.h
-//  myopencv
-//
-//  Created by lequan on 1/24/15.
-//  Copyright (c) 2015 lequan. All rights reserved.
-//
-
 #ifndef __myopencv__LBFRegressor__
 #define __myopencv__LBFRegressor__
 
@@ -49,7 +41,7 @@ public:
 		const std::vector<BoundingBox> & bounding_boxs,std::vector<bool> & result_face,float& score,int& fcount,bool& fface);
     void ReleaseFeatureSpace(struct feature_node ** binfeatures,
                              int num_train_sample);
-    int   GetCodefromTree(const Tree& tree,
+    int  GetCodefromTree(const Tree& tree,
                           const cv::Mat_<uchar>& image,
                           const cv::Mat_<float>& shapes,
                           const BoundingBox& bounding_box,
@@ -57,7 +49,7 @@ public:
                           const float scale);
     void GetCodefromRandomForest(struct feature_node *binfeature,
                                  const int index,
-                                 const cv::vector<Tree>& rand_forest,
+                                 const std::vector <Tree>& rand_forest,
                                  const cv::Mat_<uchar>& image,
                                  const cv::Mat_<float>& shape,
                                  const BoundingBox& bounding_box,
@@ -65,7 +57,7 @@ public:
                                  const float scale);
 	bool GetCodefromRandomForest2(struct feature_node *binfeature,
 		const int index,
-		const cv::vector<Tree>& rand_forest,
+		const std::vector<Tree>& rand_forest,
 		const cv::Mat_<uchar>& image,
 		const cv::Mat_<float>& shape,
 		const BoundingBox& bounding_box,
@@ -98,12 +90,12 @@ public:
                           const std::vector<BoundingBox> & bounding_boxs,
                           int stage);
     
-    void Train(const std::vector<cv::Mat_<uchar> >& images,
-               const std::vector<cv::Mat_<float> >& ground_truth_shapes,
-			   const std::vector<int>& ground_truth_faces,
-               const std::vector<BoundingBox> & bounding_boxs, int posLenth);
+    void Train( std::vector<cv::Mat_<uchar> >& images,
+                std::vector<cv::Mat_<float> >& ground_truth_shapes,
+			    std::vector<int>& ground_truth_faces,
+                std::vector<BoundingBox> & bounding_boxs, int posLenth);
     
-    std::vector<cv::Mat_<float> > Predict(const std::vector<cv::Mat_<uchar> >& images,
+    std::vector<cv::Mat_<float> > Predict( const std::vector<cv::Mat_<uchar> >& images,
                                            const std::vector<BoundingBox>& bounding_boxs,
                                            const std::vector<cv::Mat_<float> >& ground_truth_shapes,
 										   int initial_num,std::vector<bool>& result_face);
