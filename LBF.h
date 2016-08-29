@@ -1,17 +1,8 @@
-//
-//  LBF.h
-//  myopencv
-//
-//  Created by lequan on 1/24/15.
-//  Copyright (c) 2015 lequan. All rights reserved.
-//
-
 #ifndef FACE_ALIGNMENT_H
 #define FACE_ALIGNMENT_H
 #include "opencv2/objdetect/objdetect.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
-
 #include <cctype>
 #include <iostream>
 #include <iterator>
@@ -20,7 +11,7 @@
 #include <iostream>
 #include <cstdio>
 #include <cstdlib>
-#include "cv.h"
+#include "cv.hpp"
 #include <ctime>
 #include <string>
 #include <limits>
@@ -31,7 +22,15 @@
 #include <numeric>   
 #include <utility> 
 #include <omp.h>
+using namespace std;
+using namespace cv;
 
+#define SAVEBIN (0)
+#define MAXHEIGHT_POS (128)
+#define MAXHEIGHT_NEG (320)
+#define MINHEIGHT (16)
+#define CROP (0.1)
+#define FRAC (0.0)
 struct Params{
     
     float bagging_overlap;
@@ -47,8 +46,8 @@ struct Params{
 	float max_probility[10];
 };
 extern Params global_params;
-extern cv::string modelPath;
-extern cv::string dataPath;
+extern std::string modelPath;
+extern std::string dataPath;
 class BoundingBox{
     public:
         float start_x;
@@ -66,16 +65,25 @@ class BoundingBox{
             centroid_y = 0;
         }; 
 };
-cv::Mat_<float> GetMeanShape(const std::vector<cv::Mat_<float> >& shapes,
-                              const std::vector<BoundingBox>& bounding_box);
-cv::Mat_<float> GetMeanShape2(const std::vector<cv::Mat_<float> >& shapes,
-	const std::vector<BoundingBox>& bounding_box,const std::vector<int>& ground_truth_faces);
 
-void GetShapeResidual(const std::vector<cv::Mat_<float> >& ground_truth_shapes,
-                      const std::vector<cv::Mat_<float> >& current_shapes,
-                      const std::vector<BoundingBox>& bounding_boxs,
-                      const cv::Mat_<float>& mean_shape,
-                      std::vector<cv::Mat_<float> >& shape_residuals);
+void InitializeGlobalParam();
+
+Mat_<float> GetMeanShape(const vector<Mat_<float> >& shapes,
+                              const vector<BoundingBox>& bounding_box);
+Mat_<float> GetMeanShape2(const vector<Mat_<float> >& shapes,
+	const vector<BoundingBox>& bounding_box,const vector<int>& ground_truth_faces);
+
+void GetShapeResidual(const vector<Mat_<float> >& ground_truth_shapes,
+                      const vector<Mat_<float> >& current_shapes,
+                      const vector<BoundingBox>& bounding_boxs,
+                      const Mat_<float>& mean_shape,
+                      vector<Mat_<float> >& shape_residuals);
+void GetShapeResidual2(vector<int> shape_index,
+	const vector<Mat_<float> >& ground_truth_shapes,
+	const vector<Mat_<float> >& current_shapes,
+	const vector<BoundingBox>& bounding_boxs,
+	const Mat_<float>& mean_shape,
+	vector<Mat_<float> >& shape_residuals);
 
 cv::Mat_<float> ProjectShape(const cv::Mat_<float>& shape, const BoundingBox& bounding_box);
 cv::Mat_<float> ReProjectShape(const cv::Mat_<float>& shape, const BoundingBox& bounding_box);
@@ -83,60 +91,12 @@ void SimilarityTransform(const cv::Mat_<float>& shape1, const cv::Mat_<float>& s
                          cv::Mat_<float>& rotation,float& scale);
 float calculate_covariance(const std::vector<float>& v_1,
                             const std::vector<float>& v_2);
-void LoadData(std::string filepath,
-              std::vector<cv::Mat_<uchar> >& images,
-              std::vector<cv::Mat_<float> >& ground_truth_shapes,
-              std::vector<BoundingBox> & bounding_box);
-void LoadDataAdjust(std::string filepath,
-              std::vector<cv::Mat_<uchar> >& images,
-              std::vector<cv::Mat_<float> >& ground_truth_shapes,
-              std::vector<BoundingBox> & bounding_box);
-void LoadDataAdjust2(std::string filepath,
-	std::vector<cv::Mat_<uchar> >& images,
-	std::vector<cv::Mat_<float> >& ground_truth_shapes,
-	std::vector<int>& ground_truth_faces,
-	std::vector<BoundingBox> & bounding_box);
-void LoadOpencvBbxData(std::string filepath,
-                       std::vector<cv::Mat_<uchar> >& images,
-                       std::vector<cv::Mat_<float> >& ground_truth_shapes,
-                       std::vector<BoundingBox> & bounding_boxs
-                       );
-void LoadCofwTrainData(std::vector<cv::Mat_<uchar> >& images,
-                       std::vector<cv::Mat_<float> >& ground_truth_shapes,
-                       std::vector<BoundingBox>& bounding_boxs);
-void LoadCofwTestData(std::vector<cv::Mat_<uchar> >& images,
-                       std::vector<cv::Mat_<float> >& ground_truth_shapes,
-                       std::vector<BoundingBox>& bounding_boxs);
-
-BoundingBox CalculateBoundingBox(cv::Mat_<float>& shape);
-BoundingBox CalculateBoundingBox2(cv::Mat_<float>& shape);
-cv::Mat_<float> LoadGroundTruthShape(std::string& filename);
-void adjustImage(cv::Mat_<uchar>& img,
-                 cv::Mat_<float>& ground_truth_shape,
-                 BoundingBox& bounding_box);
-void adjustImage2(cv::Mat_<uchar>& img,
-	cv::Mat_<float>& ground_truth_shape,
-	BoundingBox& bounding_box);
-
-void  TrainModel(std::vector<std::string> trainDataName);
-float TestModel(std::vector<std::string> testDataName);
-int FaceDetectionAndAlignment(const char* inputname);
-void ReadGlobalParamFromFile(cv::string path);
 float CalculateError(const cv::Mat_<float>& ground_truth_shape, const cv::Mat_<float>& predicted_shape);
 
-
+BoundingBox CalculateBoundingBox(Mat_<uchar>& img, cv::Mat_<float>& shape);
+void adjustImage(Mat_<uchar>& img, Mat_<float>& ground_truth_shape, BoundingBox& bounding_box);
 void getRandomBox(const cv::Mat_<uchar>& image, const BoundingBox& old_box, BoundingBox& new_box);
+void cropBoundingBox(Mat_<uchar>& img, BoundingBox box, BoundingBox& newbox/*, Mat_<float> shapeMat_, <float>& newshape*/);
 
-#define SAVEBIN (0)
-
-#define MAXHEIGHT (60)
-
-#define MAXHEIGHT2 (240)
-
-#define ONLYSHAPE (1)
-
-#define MINHEIGHT (16)
-
-#define MAXFINDTIMES (240*240*10)
 
 #endif
