@@ -6,6 +6,8 @@ This project start with the code from https://github.com/yulequan/face-alignment
 
 You should read yulequan's codes first, then compare them with mine.
 
+Add a trained model, only for raw detection without any optimization.
+
 There are some differences between paper's and mine:
 
 1. Without SIFT+SVM
